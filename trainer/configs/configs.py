@@ -80,6 +80,7 @@ defaults = [
     {"model": "clip"},
     {"criterion": "clip"},
     {"dataset": "clip"},
+    {"dataset_custom": "clip"},
     {"optimizer": "dummy"},
     {"lr_scheduler": "dummy"},
 ]

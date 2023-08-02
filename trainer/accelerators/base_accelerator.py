@@ -53,6 +53,7 @@ class BaseAcceleratorConfig:
     mixed_precision: PrecisionType = PrecisionType.NO
     gradient_accumulation_steps: int = 1
     log_with: Optional[LoggerType] = LoggerType.WANDB
+    # log_with = None
     debug: DebugConfig = DebugConfig()
     seed: int = 42
     resume_from_checkpoint: bool = True
