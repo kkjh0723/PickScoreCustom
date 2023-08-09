@@ -23,6 +23,7 @@ class CLIPCustomDatasetConfig(BaseDatasetConfig):
     dataset_name: str = "exaone"
     dataset_config_name: str = "null"
     dataset_root: str = "/home/data/exaone_gen_imgs"
+    annotation_dir: str = "annotations"
 
     from_disk: bool = False
     train_split_key: str = "train_custom"
@@ -70,7 +71,8 @@ class CLIPCustomDataset(CLIPHFDataset):
         
         logger.info(f"Loading {self.split} dataset")
 
-        self.dataset = self.load_local_dataset(cfg.dataset_root, self.split)
+        annotation_dir = os.path.join(cfg.dataset_root, cfg.annotation_dir)
+        self.dataset = self.load_local_dataset(annotation_dir, self.split)
         # self.dataset = self.load_local_dataset(self.dataset_root, self.split)
         logger.info(f"Loaded {len(self.dataset)} examples from {self.split} dataset")
 
@@ -139,7 +141,7 @@ class CLIPCustomDataset(CLIPHFDataset):
 
     def load_local_dataset(self, path: str, split: str):
         files = glob.glob(os.path.join(path, f"{split}*.parquet"))
-        data = [pd.read_parquet(f,engine='fastparquet') for f in files]
+        data = [pd.read_parquet(f,engine='pyarrow') for f in files] # do not use engine=fastparquet
         merged_data = pd.concat(data, ignore_index=True)
         return Dataset.from_pandas(merged_data)
 
@@ -168,6 +170,17 @@ class CLIPCustomDataset(CLIPHFDataset):
             good_image_index = self.uid2index[good_image_uid]
             example[good_image_column_name] = self.dataset[good_image_index][self.uid2image_col_name[good_image_uid]]
 
+        # TODO: remove type casting after changing data type in parquet file
+        if not example[self.cfg.has_label_column_name] and ((not self.cfg.keep_only_with_label_in_non_train and self.split != self.cfg.train_split_name) or (not self.cfg.keep_only_with_label and self.split == self.cfg.train_split_name)):
+            label_0 = torch.tensor(0.5)[None]
+            label_1 = torch.tensor(0.5)[None]
+        else:
+            label_0 = torch.tensor(example[self.cfg.label_0_column_name])[None]
+            label_1 = torch.tensor(example[self.cfg.label_1_column_name])[None]
+
+        # if self.split == self.cfg.train_split_name:
+        #     print(label_0, label_1)
+
         input_ids = self.tokenize(example)
 
         pixel_0_values = self.process_image(os.path.join(self.cfg.dataset_root, example[self.cfg.image_0_uid_column_name] + '.png'))
@@ -177,8 +190,8 @@ class CLIPCustomDataset(CLIPHFDataset):
             self.cfg.input_ids_column_name: input_ids,
             self.cfg.pixels_0_column_name: pixel_0_values,
             self.cfg.pixels_1_column_name: pixel_1_values,
-            self.cfg.label_0_column_name: torch.tensor(example[self.cfg.label_0_column_name])[None],
-            self.cfg.label_1_column_name: torch.tensor(example[self.cfg.label_1_column_name])[None],
+            self.cfg.label_0_column_name: label_0,
+            self.cfg.label_1_column_name: label_1,
             self.cfg.num_examples_per_prompt_column_name: torch.tensor(example[self.cfg.num_examples_per_prompt_column_name])[None],
         }
         return item

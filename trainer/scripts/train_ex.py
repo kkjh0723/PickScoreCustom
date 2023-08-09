@@ -20,8 +20,9 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 def load_dataloaders(cfg: DictConfig, cfg_c: DictConfig) -> Any:
     dataloaders = {}
 
-    train_dataset = instantiate_with_cfg(cfg, split=cfg.train_split_name)    
+    train_dataset = instantiate_with_cfg(cfg, split=cfg.train_split_name)
     train_c_dataset = instantiate_with_cfg(cfg_c, split=cfg_c.train_split_name)
+    # train_cat_dataset = train_c_dataset
     train_cat_dataset = torch.utils.data.ConcatDataset([train_dataset, train_c_dataset])
     dataloaders[cfg.train_split_name] = torch.utils.data.DataLoader(
             train_cat_dataset,
@@ -96,7 +97,7 @@ def main(cfg: TrainerConfig) -> None:
         metrics = task.evaluate(model, criterion, split2dataloader[cfg.dataset.valid_split_name])
         accelerator.update_metrics(metrics)
         logger.info(f"*** Evaluating {cfg.dataset_custom.valid_split_key} ***")
-        metrics = task.evaluate(model, criterion, split2dataloader[cfg.dataset_custom.valid_split_key])
+        metrics = task.evaluate(model, criterion, split2dataloader[cfg.dataset_custom.valid_split_key], table_name=f"{cfg.dataset_custom.valid_split_key}_predictions")
         metrics = {f"{cfg.dataset_custom.valid_split_key}_{k}": v for k, v in metrics.items()}
         accelerator.update_metrics(metrics)
         accelerator.gradient_state.end_of_dataloader = end_of_train_dataloader
@@ -119,7 +120,7 @@ def main(cfg: TrainerConfig) -> None:
             if accelerator.should_skip(epoch, step):
                 accelerator.update_progbar_step()
                 continue
-
+            
             if accelerator.should_eval():
                 evaluate()
 
@@ -166,7 +167,7 @@ def main(cfg: TrainerConfig) -> None:
 
     for split_name in [cfg.dataset.valid_split_name, cfg.dataset_custom.valid_split_key, cfg.dataset.test_split_name, cfg.dataset_custom.test_split_key]:
         logger.info(f"*** Evaluating {split_name} ***")
-        metrics = task.evaluate(model, criterion, split2dataloader[split_name])
+        metrics = task.evaluate(model, criterion, split2dataloader[split_name], table_name=f"{split_name}_predictions")
         metrics = {f"{split_name}_{k}": v for k, v in metrics.items()}
         accelerator.update_metrics(metrics)
     accelerator.unwrap_and_save(model)

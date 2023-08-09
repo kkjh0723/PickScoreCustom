@@ -94,7 +94,7 @@ class CLIPTask(BaseTask):
         return eval_dict
 
     @torch.no_grad()
-    def evaluate(self, model, criterion, dataloader):
+    def evaluate(self, model, criterion, dataloader, table_name="test_predictions"):
         eval_dict = self.run_inference(model, criterion, dataloader)
         eval_dict = self.gather_dict(eval_dict)
         metrics = {
@@ -102,5 +102,5 @@ class CLIPTask(BaseTask):
             "num_samples": len(eval_dict["is_correct"])
         }
         if LoggerType.WANDB == self.accelerator.cfg.log_with:
-            self.log_to_wandb(eval_dict)
+            self.log_to_wandb(eval_dict, table_name=table_name)
         return metrics
